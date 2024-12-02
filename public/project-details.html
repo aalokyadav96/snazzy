@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project Details</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Project Details</h1>
+  </header>
+  
+  <main id="content">
+    <!-- Project details will be dynamically inserted here -->
+  </main>
+
+  <footer>
+    <p>&copy; 2024 My Portfolio</p>
+  </footer>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const projectId = parseInt(urlParams.get('id'), 10);
+    const project = `${JSON.stringify(projects)}`.find(p => p.id === projectId);
+
+    if (project) {
+      document.title = project.title;
+      document.getElementById('content').innerHTML = `
+        <h2>${project.title}</h2>
+        <img src="${project.image}" alt="${project.title}">
+        <p>${project.description}</p>
+        <div>
+          ${project.links.map(link => `
+            <a href="${link.url}" target="_blank">${link.text}</a>
+          `).join(' ')}
+        </div>
+      `;
+    } else {
+      document.getElementById('content').innerHTML = '<p>Project not found.</p>';
+    }
+  </script>
+</body>
+</html>
