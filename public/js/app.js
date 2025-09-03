@@ -1,23 +1,4 @@
 // ---- Utilities ----
-const API_URL = "/api";
-
-const apiFetch = async (endpoint, method = "GET", body = null, options = {}) => {
-  const controller = options.controller || new AbortController();
-  const fetchOptions = {
-    method,
-    headers: body && !(body instanceof FormData) ? { "Content-Type": "application/json" } : {},
-    signal: controller.signal
-  };
-  if (body) fetchOptions.body = body instanceof FormData ? body : typeof body === "object" ? JSON.stringify(body) : body;
-
-  const res = await fetch(`${API_URL}${endpoint}`, fetchOptions);
-  if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
-  if (options.responseType === "blob") return res;
-  if (options.responseType === "arrayBuffer") return await res.arrayBuffer();
-  const text = await res.text();
-  try { return text ? JSON.parse(text) : null; } catch { return text; }
-};
-
 const createElement = (tag, attrs = {}, children = []) => {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
@@ -34,8 +15,25 @@ const createElement = (tag, attrs = {}, children = []) => {
   return el;
 };
 
-const Button = (title, id = "", events = {}, classes = "", styles = {}) =>
-  createElement("button", { id, class: `button ${classes}`, style: styles, events }, [title]);
+// ---- Project Data ----
+const projects = [
+  {
+    id: 1,
+    title: "Portfolio Website",
+    shortDescription: "My personal portfolio built with vanilla JS and Golang backend.",
+    description: "A clean, responsive portfolio showcasing my projects, skills, and contact info.",
+    image: "assets/portfolio.png",
+    links: [{ url: "https://github.com/aalok/portfolio", text: "GitHub" }]
+  },
+  {
+    id: 2,
+    title: "Task Manager",
+    shortDescription: "A simple task manager app with MongoDB backend.",
+    description: "Lets users create, edit, and delete tasks with JWT authentication.",
+    image: "assets/task-manager.png",
+    links: [{ url: "https://github.com/aalok/task-manager", text: "GitHub" }]
+  }
+];
 
 // ---- Pages ----
 const HomePage = () =>
@@ -43,27 +41,33 @@ const HomePage = () =>
     createElement("div", { class: "hero" }, [
       createElement("h1", {}, ["Hi, I'm Aalok Yadav"]),
       createElement("p", {}, ["Full-stack Developer (Golang, MongoDB, Vanilla JS)"]),
-      Button("View My Work", "view-projects", { click: () => navigate("projects") }, "cta-btn")
+      createElement("button", {
+        id: "view-projects",
+        class: "cta-btn",
+        events: { click: () => navigate("projects") }
+      }, ["View My Work"])
     ])
   ]);
 
-const ProjectsPage = async () => {
-  const projects = await apiFetch("/projects");
-  return createElement("section", { id: "projects" }, [
+const ProjectsPage = () =>
+  createElement("section", { id: "projects" }, [
     createElement("h2", {}, ["Projects"]),
     createElement("div", { class: "grid" },
       projects.map(p => createElement("div", { class: "card" }, [
         createElement("img", { src: p.image, alt: p.title }),
         createElement("h3", {}, [p.title]),
         createElement("p", {}, [p.shortDescription]),
-        Button("Details", `project-${p.id}`, { click: () => navigate("project", { id: p.id }) }, "btn-small")
+        createElement("button", {
+          id: `project-${p.id}`,
+          class: "btn-small",
+          events: { click: () => navigate("project", { id: p.id }) }
+        }, ["Details"])
       ]))
     )
   ]);
-};
 
-const ProjectDetailsPage = async ({ id }) => {
-  const p = await apiFetch(`/projects/${id}`);
+const ProjectDetailsPage = ({ id }) => {
+  const p = projects.find(x => x.id === id);
   return !p ? createElement("p", {}, ["Project not found."]) :
     createElement("section", { id: "project-details" }, [
       createElement("h2", {}, [p.title]),
