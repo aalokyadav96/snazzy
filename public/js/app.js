@@ -229,9 +229,21 @@ async function render(route, params = {}) {
 }
 
 // ---- Init ----
-if (localStorage.getItem("theme") === "dark") document.documentElement.setAttribute("data-theme", "dark");
+if (localStorage.getItem("theme") === "dark") {
+  document.documentElement.setAttribute("data-theme", "dark");
+}
+
+// Utility to get route from URL hash
+function getRouteFromHash() {
+  const hash = window.location.hash.slice(1); // remove #
+  return hash in routes ? hash : "home";
+}
+
+// Handle browser back/forward buttons
 window.addEventListener("popstate", e => {
-  const { route, params } = e.state || { route: "home", params: {} };
+  const { route, params } = e.state || { route: getRouteFromHash(), params: {} };
   render(route, params);
 });
-render("home");
+
+// Initial render based on hash
+render(getRouteFromHash());
