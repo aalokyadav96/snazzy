@@ -4,7 +4,6 @@ const createElement = (tag, attrs = {}, children = []) => {
   for (const [k, v] of Object.entries(attrs)) {
     if (k === "events") for (const [e, fn] of Object.entries(v)) el.addEventListener(e, fn);
     else if (k === "class") el.classList.add(...v.split(" "));
-    else if (k === "dataset") Object.assign(el.dataset, v);
     else if (k in el) el[k] = v;
     else el.setAttribute(k, v);
   }
@@ -14,8 +13,7 @@ const createElement = (tag, attrs = {}, children = []) => {
   return el;
 };
 
-// ---- Projects & Blog Data ----
-// Replace with your full projects and posts arrays
+// ---- Data ----
 const projects = [
   { title: "ShowSaw", description: "A website to browse and create events and buy tickets", details: "httprouter", stack: ["JavaScript","Golang","MongoDB","Redis"], image: "./assets/showsaw.avif", github: "https://github.com/aalokyadav96/fishstick", live: "https://showsaw.netlify.app/" },
   { title: "Gyfget", description: "Salvaged Gfycat.com's frontend before it shut down.", details: "Gorilla Mux", stack: ["React.js","Golang","MongoDB","Redis"], image: "./assets/gyfget.jpg", github: "#", live: "https://gyfget.onrender.com/" },
@@ -31,95 +29,109 @@ const posts = [
   { title: "Vanilla JS vs Frameworks", excerpt: "Sometimes less is more — why I prefer building small projects without frameworks.", content: "Frameworks like React and Vue are powerful, but they also add complexity. For many projects, vanilla JS is faster, simpler, and keeps bundle sizes small.", date: "2024-12-20" }
 ];
 
-// ---- Pages ----
-const HomePage = () => createElement("section", { class: "hero" }, [
-  createElement("h1", {}, ["Hi, I'm Aalok Yadav"]),
-  createElement("p", {}, ["Full-stack Developer (Golang, MongoDB, Vanilla JS)"]),
-  createElement("button", { class: "cta-btn", events: { click: () => navigate("/projects") } }, ["View My Work"])
-]);
+// ---- Persistent Layout ----
+let mainContent;
+function initLayout() {
+  const app = document.getElementById("app");
+  if (app.children.length) return;
 
-// --- Projects ---
-const ProjectsPage = () => {
-  const searchInput = createElement("input", { type: "text", placeholder: "Search projects..." });
-  const techSelect = createElement("select", {}, [createElement("option", { value: "" }, ["All"])]);
-  Array.from(new Set(projects.flatMap(p => p.stack || []))).forEach(t => techSelect.appendChild(createElement("option", { value: t }, [t])));
-  
-  const filterDiv = createElement("div", { class: "projects-controls" }, [
-    createElement("label", {}, ["Filter by Tech: "]), techSelect,
-    searchInput
+  const themeBtn = createElement("button",{class:"theme-toggle"},[document.documentElement.getAttribute("data-theme")==="dark"?"☀️":"🌙"]);
+  themeBtn.addEventListener("click",()=>{
+    const dark = document.documentElement.getAttribute("data-theme")==="dark";
+    document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+    themeBtn.textContent = dark ? "🌙" : "☀️";
+    localStorage.setItem("theme", dark ? "light" : "dark");
+  });
+
+  const header = createElement("header", {}, [
+    createElement("div", { class:"logo"}, [createElement("h1", {}, ["Aalok Yadav"])]),
+    createElement("nav", {}, [
+      createElement("ul", {}, ["","projects","blog","about","contact"].map(p=>
+        createElement("li", {}, [
+          createElement("a",{href:p?`/${p}`:"/", events:{click:e=>{e.preventDefault(); navigate(p?`/${p}`:"/");}}},[p?p[0].toUpperCase()+p.slice(1):"Home"])
+        ])
+      ))
+    ]),
+    themeBtn
   ]);
 
-  const grid = createElement("div", { class: "grid" }, projects.map((p,i) => createProjectCard(p,i)));
+  mainContent = createElement("main", { id:"main-content" });
+  const footer = createElement("footer", {}, [createElement("p", {}, ["© 2025 Aalok Yadav"])]);
 
-  function filterProjects() {
-    const term = searchInput.value.toLowerCase();
-    const tech = techSelect.value;
-    const filtered = projects.filter(p => {
-      const matchTech = tech ? (p.stack||[]).includes(tech) : true;
-      const matchTerm = term ? p.title.toLowerCase().includes(term) || p.description.toLowerCase().includes(term) : true;
-      return matchTech && matchTerm;
-    });
-    const newGrid = createElement("div", { class: "grid" }, filtered.map((p,i) => createProjectCard(p,i)));
-    const main = document.querySelector("main");
-    main.innerHTML = "";
-    main.append(filterDiv,newGrid);
-  }
+  app.append(header, mainContent, footer);
+}
 
-  searchInput.addEventListener("input", filterProjects);
-  techSelect.addEventListener("change", filterProjects);
+// ---- Navigation ----
+function navigate(path, params={}) {
+  const url = new URL(window.location.origin + path);
+  Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
+  const scroll = window.scrollY;
+  window.history.pushState({path,params,scroll},"",url.pathname+url.search);
+  render(path,params);
+}
 
-  return createElement("section", {}, [filterDiv, grid]);
-};
+// ---- Pages ----
+const HomePage = ()=>createElement("section",{class:"hero"},[
+  createElement("h1",{},["Hi, I'm Aalok Yadav"]),
+  createElement("p",{},["Full-stack Developer (Golang, MongoDB, Vanilla JS)"]),
+  createElement("button",{class:"cta-btn",events:{click:()=>navigate("/projects")}},["View My Work"])
+]);
 
-function createProjectCard(p,i) {
+function createProjectCard(p,i){
   return createElement("div",{class:"card"},[
-    p.image ? createElement("img",{src:p.image,alt:p.title,loading:"lazy"}):null,
+    p.image?createElement("img",{src:p.image,alt:p.title,loading:"lazy"}):null,
     createElement("h3",{},[p.title]),
     createElement("p",{},[p.description]),
-    p.stack ? createElement("div",{class:"stack-tags"},p.stack.map(t=>createElement("span",{},[t]))):null,
+    p.stack?createElement("div",{class:"stack-tags"},p.stack.map(t=>createElement("span",{},[t]))):null,
     createElement("div",{class:"card-buttons"},[
       createElement("button",{class:"btn-small",events:{click:()=>navigate("/project",{id:i})}} ,["Details"]),
-      p.github ? createElement("a",{href:p.github,target:"_blank",class:"btn-small"},["GitHub"]):null,
-      p.live ? createElement("a",{href:p.live,target:"_blank",class:"btn-small"},["Live"]):null
+      p.github?createElement("a",{href:p.github,target:"_blank",class:"btn-small"},["GitHub"]):null,
+      p.live?createElement("a",{href:p.live,target:"_blank",class:"btn-small"},["Live"]):null
     ])
   ]);
 }
+
+const ProjectsPage = ()=>{
+  const searchInput = createElement("input",{type:"text",placeholder:"Search projects..."});
+  const techSelect = createElement("select",{},[createElement("option",{value:""} ,["All"])]);
+  Array.from(new Set(projects.flatMap(p=>p.stack||[]))).forEach(t=>techSelect.appendChild(createElement("option",{value:t},[t])));
+
+  const filterDiv = createElement("div",{class:"projects-controls"},[
+    createElement("label",{},["Filter by Tech: "]), techSelect, searchInput
+  ]);
+
+  const grid = createElement("div",{class:"grid"},projects.map((p,i)=>createProjectCard(p,i)));
+
+  function filterProjects(){
+    const term = searchInput.value.toLowerCase();
+    const tech = techSelect.value;
+    Array.from(grid.children).forEach((card,i)=>{
+      const p = projects[i];
+      const matchTech = tech ? (p.stack||[]).includes(tech) : true;
+      const matchTerm = term ? p.title.toLowerCase().includes(term) || p.description.toLowerCase().includes(term) : true;
+      card.style.display = matchTech && matchTerm ? "flex" : "none";
+    });
+  }
+
+  searchInput.addEventListener("input",filterProjects);
+  techSelect.addEventListener("change",filterProjects);
+
+  return createElement("section",{},[filterDiv, grid]);
+};
 
 const ProjectDetailsPage = ({id})=>{
   const p = projects[id];
   if(!p) return createElement("p",{},["Project not found."]);
   return createElement("section",{},[
     createElement("h2",{},[p.title]),
-    p.image ? createElement("img",{src:p.image,alt:p.title,loading:"lazy"}):null,
+    p.image?createElement("img",{src:p.image,alt:p.title,loading:"lazy"}):null,
     createElement("p",{},[p.details||p.description]),
-    p.stack ? createElement("ul",{},p.stack.map(s=>createElement("li",{},[s]))):null,
+    p.stack?createElement("ul",{},p.stack.map(s=>createElement("li",{},[s]))):null,
     createElement("div",{class:"card-buttons"},[
-      p.github ? createElement("a",{href:p.github,target:"_blank",class:"btn-small"},["GitHub"]):null,
-      p.live ? createElement("a",{href:p.live,target:"_blank",class:"btn-small"},["Live"]):null
+      p.github?createElement("a",{href:p.github,target:"_blank",class:"btn-small"},["GitHub"]):null,
+      p.live?createElement("a",{href:p.live,target:"_blank",class:"btn-small"},["Live"]):null
     ])
   ]);
-};
-
-// ---- Blog ----
-const BlogPage = ()=>{
-  const searchInput = createElement("input",{type:"text",placeholder:"Search posts..."});
-  const filterDiv = createElement("div",{class:"projects-controls"},[
-    createElement("label",{},["Search Blog: "]),searchInput
-  ]);
-  const grid = createElement("div",{class:"grid"},posts.map((p,i)=>createPostCard(p,i)));
-
-  function filterPosts(){
-    const term = searchInput.value.toLowerCase();
-    const filtered = posts.filter(post=>post.title.toLowerCase().includes(term) || post.excerpt.toLowerCase().includes(term));
-    const newGrid = createElement("div",{class:"grid"},filtered.map((p,i)=>createPostCard(p,i)));
-    const main = document.querySelector("main");
-    main.innerHTML="";
-    main.append(filterDiv,newGrid);
-  }
-
-  searchInput.addEventListener("input",filterPosts);
-
-  return createElement("section",{},[filterDiv,grid]);
 };
 
 function createPostCard(post,i){
@@ -131,6 +143,23 @@ function createPostCard(post,i){
   ]);
 }
 
+const BlogPage = ()=>{
+  const searchInput = createElement("input",{type:"text",placeholder:"Search posts..."});
+  const filterDiv = createElement("div",{class:"projects-controls"},[createElement("label",{},["Search Blog: "]), searchInput]);
+  const grid = createElement("div",{class:"grid"},posts.map((p,i)=>createPostCard(p,i)));
+
+  function filterPosts(){
+    const term = searchInput.value.toLowerCase();
+    Array.from(grid.children).forEach((card,i)=>{
+      const post = posts[i];
+      card.style.display = post.title.toLowerCase().includes(term)||post.excerpt.toLowerCase().includes(term)?"flex":"none";
+    });
+  }
+
+  searchInput.addEventListener("input",filterPosts);
+  return createElement("section",{},[filterDiv, grid]);
+};
+
 const PostDetailsPage = ({id})=>{
   const post = posts[id];
   if(!post) return createElement("p",{},["Post not found."]);
@@ -141,7 +170,6 @@ const PostDetailsPage = ({id})=>{
   ]);
 };
 
-// ---- About & Contact ----
 const AboutPage = ()=>createElement("section",{},[
   createElement("h2",{},["About Me"]),
   createElement("p",{},["I’m a backend-focused developer with strong skills in Golang, MongoDB, and vanilla JavaScript. I enjoy building fast, minimal, and reliable applications."])
@@ -151,7 +179,7 @@ const ContactPage = ()=>createElement("section",{},[
   createElement("h2",{},["Contact"]),
   createElement("p",{},["Let’s connect and collaborate!"]),
   createElement("a",{href:"mailto:Aalok@example.com"},["Aalok@example.com"]),
-  createElement("button",{class:"btn-small",events:{click:()=>navigator.clipboard.writeText("Aalok@example.com")}} ,["Copy Email"])
+  createElement("button",{class:"btn-small",events:{click:()=>navigator.clipboard.writeText("Aalok@example.com")}},["Copy Email"])
 ]);
 
 // ---- Router ----
@@ -165,49 +193,23 @@ const routes = {
   "/contact": ContactPage
 };
 
-// ---- Navigation & Render ----
-function navigate(path, params={}){
-  const url = new URL(window.location.origin + path);
-  Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
-  const scroll = window.scrollY;
-  window.history.pushState({path,params,scroll},"",url.pathname+url.search);
-  render(path,params);
-}
+// ---- Render ----
+async function render(path, params={}) {
+  initLayout();
+  const main = mainContent;
 
-async function render(path, params={}){
-  const app = document.getElementById("app");
-  app.classList.add("fade-out");
+  main.classList.add("fade-out");
   await new Promise(r=>setTimeout(r,150));
-  app.innerHTML="";
-  app.classList.remove("fade-out");
+  main.innerHTML = "";
+  main.classList.remove("fade-out");
 
-  document.title=`Aalok Yadav - ${path==="/"?"Home":path.replace("/","").toUpperCase()}`;
-
-  const themeBtn = createElement("button",{class:"theme-toggle"},[document.documentElement.getAttribute("data-theme")==="dark"?"☀️":"🌙"]);
-  themeBtn.addEventListener("click",()=>{
-    const dark=document.documentElement.getAttribute("data-theme")==="dark";
-    document.documentElement.setAttribute("data-theme",dark?"light":"dark");
-    themeBtn.textContent = dark?"🌙":"☀️";
-    localStorage.setItem("theme",dark?"light":"dark");
-  });
-
-  const header = createElement("header",{},[
-    createElement("div",{class:"logo"},[createElement("h1",{},["Aalok Yadav"])]),
-    createElement("nav",{},[
-      createElement("ul",{},["","projects","blog","about","contact"].map(p=>
-        createElement("li",{},[createElement("a",{href:p?`/${p}`:"/",events:{click:e=>{e.preventDefault();navigate(p?`/${p}`:"/");}}},[p?p[0].toUpperCase()+p.slice(1):"Home"])]))
-      )
-    ]),
-    themeBtn
-  ]);
+  document.title = `Aalok Yadav - ${path==="/"?"Home":path.replace("/","").toUpperCase()}`;
 
   const page = await routes[path](params);
-  const footer = createElement("footer",{},[createElement("p",{},["© 2025 Aalok Yadav"])]);
+  main.appendChild(page);
 
-  app.append(header,createElement("main",{},[page]),footer);
-
-  app.classList.add("fade-in");
-  setTimeout(()=>app.classList.remove("fade-in"),300);
+  main.classList.add("fade-in");
+  setTimeout(()=>main.classList.remove("fade-in"),300);
 }
 
 // ---- Init ----
@@ -218,4 +220,6 @@ window.addEventListener("popstate", e=>{
   render(state.path,state.params).then(()=>window.scrollTo(0,state.scroll));
 });
 
-render(window.location.pathname,Object.fromEntries(new URLSearchParams(window.location.search)));
+// Initial render
+render(window.location.pathname, Object.fromEntries(new URLSearchParams(window.location.search)));
+
