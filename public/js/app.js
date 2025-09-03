@@ -1,77 +1,95 @@
-import { createElement } from "../../components/createElement.js";
-import { apiFetch } from "../../../api/api.js";
-import Button from "../../components/base/Button.js";
+// ---- Utilities ----
+const API_URL = "/api";
 
-// ---- Page Components ----
-const HomePage = () => {
-  return createElement("section", { id: "home" }, [
+const apiFetch = async (endpoint, method = "GET", body = null, options = {}) => {
+  const controller = options.controller || new AbortController();
+  const fetchOptions = {
+    method,
+    headers: body && !(body instanceof FormData) ? { "Content-Type": "application/json" } : {},
+    signal: controller.signal
+  };
+  if (body) fetchOptions.body = body instanceof FormData ? body : typeof body === "object" ? JSON.stringify(body) : body;
+
+  const res = await fetch(`${API_URL}${endpoint}`, fetchOptions);
+  if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+  if (options.responseType === "blob") return res;
+  if (options.responseType === "arrayBuffer") return await res.arrayBuffer();
+  const text = await res.text();
+  try { return text ? JSON.parse(text) : null; } catch { return text; }
+};
+
+const createElement = (tag, attrs = {}, children = []) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "events") for (const [e, fn] of Object.entries(v)) el.addEventListener(e, fn);
+    else if (k === "class") el.classList.add(...v.split(" "));
+    else if (k === "style") Object.assign(el.style, v);
+    else if (k === "dataset") Object.assign(el.dataset, v);
+    else if (k in el) el[k] = v;
+    else el.setAttribute(k, v);
+  }
+  [].concat(children).forEach(c => {
+    if (c || c === 0) el.appendChild(typeof c === "string" || typeof c === "number" ? document.createTextNode(c) : c);
+  });
+  return el;
+};
+
+const Button = (title, id = "", events = {}, classes = "", styles = {}) =>
+  createElement("button", { id, class: `button ${classes}`, style: styles, events }, [title]);
+
+// ---- Pages ----
+const HomePage = () =>
+  createElement("section", { id: "home" }, [
     createElement("div", { class: "hero" }, [
-      createElement("h1", {}, ["Hi, I'm Awdhoot Yadav"]),
+      createElement("h1", {}, ["Hi, I'm Aalok Yadav"]),
       createElement("p", {}, ["Full-stack Developer (Golang, MongoDB, Vanilla JS)"]),
-      Button("View My Work", "view-projects", {
-        click: () => navigate("projects")
-      }, "cta-btn")
+      Button("View My Work", "view-projects", { click: () => navigate("projects") }, "cta-btn")
     ])
   ]);
-};
 
 const ProjectsPage = async () => {
   const projects = await apiFetch("/projects");
   return createElement("section", { id: "projects" }, [
     createElement("h2", {}, ["Projects"]),
-    createElement("div", { class: "grid" }, projects.map(project =>
-      createElement("div", { class: "card" }, [
-        createElement("img", { src: project.image, alt: project.title }),
-        createElement("h3", {}, [project.title]),
-        createElement("p", {}, [project.shortDescription]),
-        Button("Details", `project-${project.id}`, {
-          click: () => navigate("project", { id: project.id })
-        }, "btn-small")
-      ])
-    ))
+    createElement("div", { class: "grid" },
+      projects.map(p => createElement("div", { class: "card" }, [
+        createElement("img", { src: p.image, alt: p.title }),
+        createElement("h3", {}, [p.title]),
+        createElement("p", {}, [p.shortDescription]),
+        Button("Details", `project-${p.id}`, { click: () => navigate("project", { id: p.id }) }, "btn-small")
+      ]))
+    )
   ]);
 };
 
-const ProjectDetailsPage = async (params) => {
-  const project = await apiFetch(`/projects/${params.id}`);
-  if (!project) {
-    return createElement("p", {}, ["Project not found."]);
-  }
-  return createElement("section", { id: "project-details" }, [
-    createElement("h2", {}, [project.title]),
-    createElement("img", { src: project.image, alt: project.title }),
-    createElement("p", {}, [project.description]),
-    createElement("div", { class: "links" }, project.links.map(link =>
-      createElement("a", { href: link.url, target: "_blank" }, [link.text])
-    ))
-  ]);
+const ProjectDetailsPage = async ({ id }) => {
+  const p = await apiFetch(`/projects/${id}`);
+  return !p ? createElement("p", {}, ["Project not found."]) :
+    createElement("section", { id: "project-details" }, [
+      createElement("h2", {}, [p.title]),
+      createElement("img", { src: p.image, alt: p.title }),
+      createElement("p", {}, [p.description]),
+      createElement("div", { class: "links" },
+        p.links.map(l => createElement("a", { href: l.url, target: "_blank" }, [l.text]))
+      )
+    ]);
 };
 
-const AboutPage = () => {
-  return createElement("section", { id: "about" }, [
+const AboutPage = () =>
+  createElement("section", { id: "about" }, [
     createElement("h2", {}, ["About Me"]),
-    createElement("p", {}, [
-      "I’m a backend-focused developer with strong skills in Golang, MongoDB, and building fast, clean frontends with vanilla JavaScript."
-    ])
+    createElement("p", {}, ["I’m a backend-focused developer with strong skills in Golang, MongoDB, and building fast, clean frontends with vanilla JavaScript."])
   ]);
-};
 
-const ContactPage = () => {
-  return createElement("section", { id: "contact" }, [
+const ContactPage = () =>
+  createElement("section", { id: "contact" }, [
     createElement("h2", {}, ["Contact"]),
     createElement("p", {}, ["Feel free to reach out!"]),
-    createElement("a", { href: "mailto:awdhoot@example.com" }, ["awdhoot@example.com"])
+    createElement("a", { href: "mailto:Aalok@example.com" }, ["Aalok@example.com"])
   ]);
-};
 
 // ---- Router ----
-const routes = {
-  home: HomePage,
-  projects: ProjectsPage,
-  project: ProjectDetailsPage,
-  about: AboutPage,
-  contact: ContactPage
-};
+const routes = { home: HomePage, projects: ProjectsPage, project: ProjectDetailsPage, about: AboutPage, contact: ContactPage };
 
 function navigate(route, params = {}) {
   window.history.pushState({ route, params }, "", `#${route}`);
@@ -80,57 +98,35 @@ function navigate(route, params = {}) {
 
 async function render(route, params = {}) {
   const app = document.getElementById("app");
-  app.innerHTML = ""; // clear
-  const themeToggleBtn = createElement("button", { class: "theme-toggle" }, ["🌙"]);
+  app.innerHTML = "";
 
-  themeToggleBtn.addEventListener("click", () => {
-    const currentTheme = document.documentElement.getAttribute("data-theme");
-    if (currentTheme === "dark") {
-      document.documentElement.removeAttribute("data-theme");
-      themeToggleBtn.textContent = "🌙";
-      localStorage.setItem("theme", "light");
-    } else {
-      document.documentElement.setAttribute("data-theme", "dark");
-      themeToggleBtn.textContent = "☀️";
-      localStorage.setItem("theme", "dark");
-    }
+  const themeBtn = createElement("button", { class: "theme-toggle" }, [document.documentElement.getAttribute("data-theme") === "dark" ? "☀️" : "🌙"]);
+  themeBtn.addEventListener("click", () => {
+    const dark = document.documentElement.getAttribute("data-theme") === "dark";
+    document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+    themeBtn.textContent = dark ? "🌙" : "☀️";
+    localStorage.setItem("theme", dark ? "light" : "dark");
   });
 
   const header = createElement("header", {}, [
-    createElement("div", { class: "logo" }, [
-      createElement("h1", {}, ["Awdhoot Yadav"])
-    ]),
-    createElement("nav", {}, [
-      createElement("ul", {}, [
-        createElement("li", {}, [createElement("a", { href: "#", onclick: () => navigate("home") }, ["Home"])]),
-        createElement("li", {}, [createElement("a", { href: "#", onclick: () => navigate("projects") }, ["Projects"])]),
-        createElement("li", {}, [createElement("a", { href: "#", onclick: () => navigate("about") }, ["About"])]),
-        createElement("li", {}, [createElement("a", { href: "#", onclick: () => navigate("contact") }, ["Contact"])]),
-      ])
-    ]),
-    themeToggleBtn
+    createElement("div", { class: "logo" }, [createElement("h1", {}, ["Aalok Yadav"])]),
+    createElement("nav", {}, [createElement("ul", {}, [
+      ...["home", "projects", "about", "contact"].map(r =>
+        createElement("li", {}, [createElement("a", { href: "#", events: { click: () => navigate(r) } }, [r[0].toUpperCase() + r.slice(1)])]))
+    ])]),
+    themeBtn
   ]);
-
 
   const page = await routes[route](params);
+  const footer = createElement("footer", {}, [createElement("p", {}, ["© 2025 Aalok Yadav"])]);
 
-  const footer = createElement("footer", {}, [
-    createElement("p", {}, ["© 2025 Awdhoot Yadav"])
-  ]);
-
-  app.appendChild(header);
-  app.appendChild(createElement("main", {}, [page]));
-  app.appendChild(footer);
-}
-const savedTheme = localStorage.getItem("theme");
-if (savedTheme === "dark") {
-  document.documentElement.setAttribute("data-theme", "dark");
+  app.append(header, createElement("main", {}, [page]), footer);
 }
 
 // ---- Init ----
-window.addEventListener("popstate", (e) => {
+if (localStorage.getItem("theme") === "dark") document.documentElement.setAttribute("data-theme", "dark");
+window.addEventListener("popstate", e => {
   const { route, params } = e.state || { route: "home", params: {} };
   render(route, params);
 });
-
 render("home");
